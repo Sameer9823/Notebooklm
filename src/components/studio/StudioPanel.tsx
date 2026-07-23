@@ -55,13 +55,13 @@ export function StudioPanel({ citation, onClose }: { citation: Citation | null; 
     <AnimatePresence>
       {citation && (
         <motion.aside
-          initial={{ width: 0, opacity: 0 }}
-          animate={{ width: 380, opacity: 1 }}
-          exit={{ width: 0, opacity: 0 }}
+          initial={{ opacity: 0, x: 24 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 24 }}
           transition={{ type: "spring", stiffness: 260, damping: 30 }}
-          className="h-full shrink-0 overflow-hidden border-l border-border bg-card/40"
+          className="fixed inset-0 z-50 overflow-hidden bg-card lg:static lg:z-auto lg:h-full lg:w-[380px] lg:shrink-0 lg:border-l lg:border-border lg:bg-card/40"
         >
-          <div className="flex h-full w-[380px] flex-col">
+          <div className="flex h-full w-full flex-col">
             <div className="flex items-center justify-between gap-2 border-b border-border p-3">
               <div className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 <FileSearch className="h-3.5 w-3.5 shrink-0" />

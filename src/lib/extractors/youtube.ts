@@ -21,9 +21,25 @@ export function parseYoutubeId(url: string): string {
   throw new Error("Could not parse a YouTube video id from that URL");
 }
 
+// Cached Innertube session. IMPORTANT: previously this was never reset on
+// failure, so a single stale/bad session (e.g. after YouTube rotates a
+// server-side check) would keep 400'ing on every future request until the
+// process restarted. `getInnertube(forceFresh)` lets callers force a
+// rebuild.
 let innertube: Innertube | null = null;
-async function getInnertube() {
-  if (!innertube) innertube = await Innertube.create({ retrieve_player: false });
+async function getInnertube(forceFresh = false): Promise<Innertube> {
+  if (forceFresh) innertube = null;
+  if (!innertube) {
+    innertube = await Innertube.create({
+      retrieve_player: false,
+      // Building the session locally (instead of round-tripping to
+      // YouTube for one) is faster and avoids a class of 400s that show
+      // up specifically when requests originate from cloud/datacenter
+      // IPs, which is the most common cause of "get_transcript failed
+      // with status 400" in server environments.
+      generate_session_locally: true,
+    });
+  }
   return innertube;
 }
 
@@ -33,6 +49,13 @@ async function getInnertube() {
  * the watch page's HTML for a caption track URL. Falls back to the
  * `youtube-transcript` package, which does scrape HTML, in case a specific
  * video/caption shape trips up the primary path.
+ *
+ * NOTE: keep the `youtubei.js` dependency current. YouTube changes its
+ * internal InnerTube API (client version strings, session/attestation
+ * tokens, etc.) often enough that an outdated version of this library will
+ * start getting 400s on `get_transcript` for videos that actually do have
+ * captions. If this keeps failing after the retry below, `npm install
+ * youtubei.js@latest youtube-transcript@latest` first.
  */
 export async function extractYoutube(url: string): Promise<YoutubeExtractResult> {
   const videoId = parseYoutubeId(url);
@@ -40,20 +63,30 @@ export async function extractYoutube(url: string): Promise<YoutubeExtractResult>
   try {
     return await extractViaInnertube(videoId);
   } catch (primaryErr) {
+    // One retry with a completely fresh session before giving up on the
+    // primary path — a stale cached session is a common cause of 400s and
+    // this recovers from it without needing a process restart.
     try {
-      return await extractViaScraper(videoId, url);
-    } catch (fallbackErr) {
-      throw new Error(
-        `Couldn't fetch captions for this video. Primary method: ${describeError(primaryErr)}. Fallback method: ${describeError(
-          fallbackErr
-        )}.`
-      );
+      return await extractViaInnertube(videoId, /* forceFresh */ true);
+    } catch (retryErr) {
+      try {
+        return await extractViaScraper(videoId, url);
+      } catch (fallbackErr) {
+        throw new Error(
+          `Couldn't fetch captions for this video. This usually means either ` +
+            `(a) the video genuinely has no captions/auto-captions enabled, or ` +
+            `(b) the YouTube API client library is out of date and needs updating. ` +
+            `Primary method: ${describeError(retryErr ?? primaryErr)}. Fallback method: ${describeError(
+              fallbackErr
+            )}.`
+        );
+      }
     }
   }
 }
 
-async function extractViaInnertube(videoId: string): Promise<YoutubeExtractResult> {
-  const yt = await getInnertube();
+async function extractViaInnertube(videoId: string, forceFresh = false): Promise<YoutubeExtractResult> {
+  const yt = await getInnertube(forceFresh);
   const info = await yt.getInfo(videoId);
 
   const transcriptData = await info.getTranscript();
