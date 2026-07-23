@@ -1,6 +1,7 @@
 import { Innertube } from "youtubei.js";
 import { YoutubeTranscript } from "youtube-transcript";
 import type { Cue } from "@/lib/chunking";
+import { describeError } from "@/lib/utils";
 
 export type YoutubeExtractResult = {
   videoId: string;
@@ -41,10 +42,11 @@ export async function extractYoutube(url: string): Promise<YoutubeExtractResult>
   } catch (primaryErr) {
     try {
       return await extractViaScraper(videoId, url);
-    } catch {
-      const reason = primaryErr instanceof Error ? primaryErr.message : "unknown error";
+    } catch (fallbackErr) {
       throw new Error(
-        `Couldn't fetch captions for this video (${reason}). It may have captions disabled, be age-restricted/private, or region-locked.`
+        `Couldn't fetch captions for this video. Primary method: ${describeError(primaryErr)}. Fallback method: ${describeError(
+          fallbackErr
+        )}.`
       );
     }
   }

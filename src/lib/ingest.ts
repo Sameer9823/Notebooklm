@@ -8,6 +8,7 @@ import { extractPdf } from "@/lib/extractors/pdf";
 import { extractUrl } from "@/lib/extractors/url";
 import { extractYoutube } from "@/lib/extractors/youtube";
 import { extractVtt } from "@/lib/extractors/vtt";
+import { describeError } from "@/lib/utils";
 import type { Source } from "@prisma/client";
 
 /**
@@ -94,7 +95,7 @@ export async function runIngestPipeline(sourceId: string) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Indexing failed";
     // eslint-disable-next-line no-console
-    console.error(`[ingest] source ${source.id} (${source.type} "${source.title}") failed:`, err);
+    console.error(`[ingest] source ${source.id} (${source.type} "${source.title}") failed:`, describeError(err));
     await db.source.update({
       where: { id: source.id },
       data: { status: "FAILED", errorMessage: message },
