@@ -1,0 +1,122 @@
+// Prisma schema — Neon Postgres
+// Run `npm run db:push` to sync, or `npm run db:migrate` for migrations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SourceType {
+  PDF
+  TEXT
+  URL
+  YOUTUBE
+  VTT
+}
+
+enum SourceStatus {
+  UPLOADING
+  QUEUED
+  INDEXING
+  READY
+  FAILED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
+model Notebook {
+  id          String   @id @default(cuid())
+  ownerId     String   // Clerk user id — enforces per-user notebook isolation
+  title       String   @default("Untitled notebook")
+  description String?
+  icon        String   @default("notebook")
+  color       String   @default("violet")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sources  Source[]
+  messages Message[]
+
+  @@index([ownerId, updatedAt])
+}
+
+model Source {
+  id            String       @id @default(cuid())
+  notebookId    String
+  notebook      Notebook     @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+
+  type          SourceType
+  title         String
+  status        SourceStatus @default(UPLOADING)
+  errorMessage  String?
+
+  // Raw location / payload
+  originUrl     String?      // website or youtube url
+  storagePath   String?      // path to stored raw file (pdf/vtt) on disk or blob store
+  rawText       String?      @db.Text // for TEXT sources, or extracted plain text cache (preview)
+
+  // Metadata
+  fileSizeBytes Int?
+  pageCount     Int?         // pdf
+  durationSec   Int?         // youtube
+  language      String?
+  metadata      Json?        // arbitrary: author, published date, video channel, etc.
+
+  chunkCount    Int          @default(0)
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  indexedAt     DateTime?
+
+  chunks        Chunk[]
+
+  @@index([notebookId])
+  @@index([status])
+}
+
+model Chunk {
+  id         String   @id @default(cuid())
+  sourceId   String
+  source     Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  notebookId String   // denormalized for fast filtering
+
+  index      Int      // order within source
+  content    String   @db.Text
+  tokenCount Int?
+
+  // For citation / deep-linking back to origin
+  startChar  Int?     // TEXT/URL: char offset
+  endChar    Int?
+  page       Int?     // PDF: page number
+  startSec   Int?     // YOUTUBE/VTT: timestamp start (seconds)
+  endSec     Int?     // YOUTUBE/VTT: timestamp end (seconds)
+
+  // vector id in Qdrant (== this chunk's id, kept explicit for clarity)
+  vectorId   String   @unique
+
+  createdAt  DateTime @default(now())
+
+  @@index([sourceId])
+  @@index([notebookId])
+}
+
+model Message {
+  id         String      @id @default(cuid())
+  notebookId String
+  notebook   Notebook    @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+
+  role       MessageRole
+  content    String      @db.Text
+  citations  Json?       // array of { chunkId, sourceId, sourceTitle, page?, startSec?, endSec?, snippet }
+
+  createdAt  DateTime    @default(now())
+
+  @@index([notebookId, createdAt])
+}
