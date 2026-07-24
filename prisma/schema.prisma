@@ -31,6 +31,14 @@ enum MessageRole {
   ASSISTANT
 }
 
+enum AudioStatus {
+  QUEUED
+  SCRIPTING
+  SYNTHESIZING
+  READY
+  FAILED
+}
+
 model Notebook {
   id          String   @id @default(cuid())
   ownerId     String   // Clerk user id — enforces per-user notebook isolation
@@ -41,10 +49,36 @@ model Notebook {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  sources  Source[]
-  messages Message[]
+  sources        Source[]
+  messages       Message[]
+  audioOverviews AudioOverview[]
 
   @@index([ownerId, updatedAt])
+}
+
+model AudioOverview {
+  id         String      @id @default(cuid())
+  notebookId String
+  notebook   Notebook    @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+
+  status       AudioStatus @default(QUEUED)
+  errorMessage String?
+
+  // Two-host dialogue script, generated from the notebook's sources:
+  // [{ speaker: "A" | "B", text: string }, ...]
+  script       Json?
+
+  // MP3 bytes stored directly in Postgres — fine at demo/small scale.
+  // Swap for S3/Blob storage + a `audioUrl` field if file sizes grow.
+  audioData    Bytes?
+  durationSec  Int?
+  voiceA       String      @default("alloy")
+  voiceB       String      @default("onyx")
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([notebookId, createdAt])
 }
 
 model Source {

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import { useAddSource } from "@/hooks/use-add-source";
 import type { SourceType } from "@/types";
 
 type Tile = { type: SourceType; label: string; hint: string; icon: typeof FileIcon };
@@ -34,55 +34,25 @@ export function AddSourceDialog({
   onAdded: () => void;
 }) {
   const [selected, setSelected] = useState<SourceType | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const { submitting, submitJson: submitJsonBase, submitFile: submitFileBase } = useAddSource(notebookId, onAdded);
 
   function reset() {
     setSelected(null);
-    setSubmitting(false);
   }
 
   async function submitJson(body: object) {
-    setSubmitting(true);
-    try {
-      const res = await fetch(`/api/notebooks/${notebookId}/sources`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.formErrors?.[0] || err.error || "Failed to add source");
-      }
-      toast.success("Source added — indexing now");
-      onAdded();
+    const ok = await submitJsonBase(body);
+    if (ok) {
       onOpenChange(false);
       reset();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      setSubmitting(false);
     }
   }
 
   async function submitFile(file: File, type: "PDF" | "VTT") {
-    setSubmitting(true);
-    try {
-      const form = new FormData();
-      form.append("file", file);
-      form.append("type", type);
-      const res = await fetch(`/api/notebooks/${notebookId}/sources`, { method: "POST", body: form });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Failed to upload file");
-      }
-      toast.success("Source uploaded — indexing now");
-      onAdded();
+    const ok = await submitFileBase(file, type);
+    if (ok) {
       onOpenChange(false);
       reset();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
-      setSubmitting(false);
     }
   }
 

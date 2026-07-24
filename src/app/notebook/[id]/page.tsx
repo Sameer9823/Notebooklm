@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, Library, Menu, Sparkles, X } from "lucide-react";
+import { ArrowLeft, Headphones, Library, Menu, Sparkles, X } from "lucide-react";
 import { SourcesRail } from "@/components/notebook/SourcesRail";
-import { ChatPanel } from "@/components/chat/ChatPanel";
+import { ChatPanel, type ChatPanelHandle } from "@/components/chat/ChatPanel";
 import { StudioPanel } from "@/components/studio/StudioPanel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import type { Citation, MessageDTO, NotebookDTO, SourceDTO } from "@/types";
+import { AudioOverviewPanel } from "@/components/studio/AudioOverviewPanel";
 
 type NotebookFull = NotebookDTO & { sources: SourceDTO[]; messages: MessageDTO[] };
 
@@ -21,6 +23,9 @@ export default function NotebookPage() {
   const [activeSourceId, setActiveSourceId] = useState<string | null>(null);
   const [citation, setCitation] = useState<Citation | null>(null);
   const [mobileSourcesOpen, setMobileSourcesOpen] = useState(false);
+  const [audioOpen, setAudioOpen] = useState(false);
+  const [addSourceOpen, setAddSourceOpen] = useState(false);
+  const chatRef = useRef<ChatPanelHandle>(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/notebooks/${id}`, { cache: "no-store" });
@@ -30,6 +35,20 @@ export default function NotebookPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // "/" focuses the chat input, "a" opens Add Source, Esc closes whatever
+  // overlay is currently open — citation panel, then audio overview, then
+  // add-source dialog, then the mobile sources drawer (first one open wins).
+  useKeyboardShortcuts({
+    onFocusChat: () => chatRef.current?.focusInput(),
+    onAddSource: () => setAddSourceOpen(true),
+    onEscape: () => {
+      if (citation) setCitation(null);
+      else if (audioOpen) setAudioOpen(false);
+      else if (addSourceOpen) setAddSourceOpen(false);
+      else if (mobileSourcesOpen) setMobileSourcesOpen(false);
+    },
+  });
 
   if (!notebook) {
     return (
@@ -67,6 +86,17 @@ export default function NotebookPage() {
           >
             <Library className="h-4 w-4" />
           </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setCitation(null);
+              setAudioOpen(true);
+            }}
+            title="Audio overview"
+          >
+            <Headphones className="h-4 w-4" />
+          </Button>
           <UserButton />
         </div>
       </header>
@@ -80,6 +110,8 @@ export default function NotebookPage() {
             activeSourceId={activeSourceId}
             onSelectSource={setActiveSourceId}
             onRefresh={load}
+            addOpen={addSourceOpen}
+            onAddOpenChange={setAddSourceOpen}
           />
         </div>
 
@@ -117,6 +149,8 @@ export default function NotebookPage() {
                       setMobileSourcesOpen(false);
                     }}
                     onRefresh={load}
+                    addOpen={addSourceOpen}
+                    onAddOpenChange={setAddSourceOpen}
                   />
                 </div>
               </motion.div>
@@ -125,10 +159,25 @@ export default function NotebookPage() {
         </AnimatePresence>
 
         <div className="min-w-0 flex-1">
-          <ChatPanel notebookId={notebook.id} initialMessages={notebook.messages} sources={notebook.sources} onOpenCitation={setCitation} />
+          <ChatPanel
+            ref={chatRef}
+            notebookId={notebook.id}
+            initialMessages={notebook.messages}
+            sources={notebook.sources}
+            onOpenCitation={(c) => {
+              setAudioOpen(false);
+              setCitation(c);
+            }}
+          />
         </div>
 
         <StudioPanel citation={citation} onClose={() => setCitation(null)} />
+        <AudioOverviewPanel
+          notebookId={notebook.id}
+          hasReadySources={notebook.sources.some((s) => s.status === "READY")}
+          open={audioOpen}
+          onClose={() => setAudioOpen(false)}
+        />
       </div>
     </div>
   );

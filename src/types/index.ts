@@ -46,3 +46,17 @@ export type MessageDTO = {
   citations?: Citation[] | null;
   createdAt: string;
 };
+
+export type AudioStatus = "QUEUED" | "SCRIPTING" | "SYNTHESIZING" | "READY" | "FAILED";
+
+export type AudioScriptLine = { speaker: "A" | "B"; text: string };
+
+export type AudioOverviewDTO = {
+  id: string;
+  status: AudioStatus;
+  errorMessage?: string | null;
+  script?: AudioScriptLine[] | null;
+  durationSec?: number | null;
+  createdAt: string;
+  hasAudio: boolean;
+};

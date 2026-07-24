@@ -93,8 +93,8 @@ export function SourceListItem({
             disabled={busy}
             aria-label="Source actions"
             className={cn(
-              "flex shrink-0 items-center justify-center rounded-md border p-1.5 transition-colors",
-              menuOpen ? "border-border bg-secondary text-foreground" : "border-transparent bg-secondary/40 text-muted-foreground hover:bg-secondary hover:text-foreground"
+              "flex shrink-0 items-center justify-center rounded-md border border-border bg-secondary p-2 text-foreground transition-colors hover:bg-secondary/80",
+              menuOpen && "ring-1 ring-primary/50"
             )}
           >
             <MoreVertical className="h-4 w-4" />

@@ -43,3 +43,30 @@ export async function getProgress(sourceId: string): Promise<IndexingProgress | 
     return null;
   }
 }
+
+export type AudioProgress = {
+  status: "QUEUED" | "SCRIPTING" | "SYNTHESIZING" | "READY" | "FAILED";
+  step?: string;
+  percent?: number;
+  errorMessage?: string;
+  updatedAt: number;
+};
+
+const audioKey = (audioId: string) => `audio:${audioId}:progress`;
+
+export async function setAudioProgress(audioId: string, progress: AudioProgress) {
+  try {
+    await redis.set(audioKey(audioId), JSON.stringify(progress), "EX", 60 * 30);
+  } catch {
+    // Redis is a cache, not the source of truth — swallow and rely on Postgres.
+  }
+}
+
+export async function getAudioProgress(audioId: string): Promise<AudioProgress | null> {
+  try {
+    const raw = await redis.get(audioKey(audioId));
+    return raw ? (JSON.parse(raw) as AudioProgress) : null;
+  } catch {
+    return null;
+  }
+}

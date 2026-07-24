@@ -3,17 +3,11 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { formatDistanceToNow } from "date-fns";
-import { Library, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { notebookIcon, notebookAccent } from "@/lib/notebook-meta";
 import type { NotebookDTO } from "@/types";
-
-const ACCENTS: Record<string, string> = {
-  teal: "from-primary/25 via-primary/5 to-transparent",
-  amber: "from-accent/25 via-accent/5 to-transparent",
-  violet: "from-violet-400/25 via-violet-400/5 to-transparent",
-  rose: "from-rose-400/25 via-rose-400/5 to-transparent",
-};
 
 export function NotebookCard({
   notebook,
@@ -24,14 +18,16 @@ export function NotebookCard({
   onRename: () => void;
   onDelete: () => void;
 }) {
+  const Icon = notebookIcon(notebook.icon);
+
   return (
     <motion.div layout initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }}>
       <Card className="group relative overflow-hidden">
-        <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${ACCENTS[notebook.color] ?? ACCENTS.teal}`} />
+        <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${notebookAccent(notebook.color)}`} />
         <Link href={`/notebook/${notebook.id}`} className="relative block p-5">
           <div className="flex items-center justify-between">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary/70">
-              <Library className="h-4 w-4 text-primary" />
+              <Icon className="h-4 w-4 text-primary" />
             </div>
           </div>
           <h3 className="mt-4 truncate font-display text-base font-semibold">{notebook.title}</h3>

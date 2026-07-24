@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Mic, MicOff, Send, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -13,21 +13,25 @@ import type { Citation, MessageDTO, SourceDTO } from "@/types";
 
 const CITATIONS_MARKER = "\n\u0000CITATIONS\u0000";
 
-export function ChatPanel({
-  notebookId,
-  initialMessages,
-  sources,
-  onOpenCitation,
-}: {
+export type ChatPanelHandle = {
+  focusInput: () => void;
+};
+
+export const ChatPanel = forwardRef<ChatPanelHandle, {
   notebookId: string;
   initialMessages: MessageDTO[];
   sources: SourceDTO[];
   onOpenCitation: (c: Citation) => void;
-}) {
+}>(function ChatPanel({ notebookId, initialMessages, sources, onOpenCitation }, ref) {
   const [messages, setMessages] = useState<(MessageDTO & { streaming?: boolean })[]>(initialMessages);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    focusInput: () => textareaRef.current?.focus(),
+  }));
 
   const { isSupported: micSupported, isListening, toggle: toggleMic } = useSpeechRecognition(setInput);
 
@@ -37,8 +41,6 @@ export function ChatPanel({
 
   const readySources = sources.filter((s) => s.status === "READY");
 
-  // Shared streaming runner. `assistantId` lets `regenerate` reuse an
-  // existing bubble instead of appending a new one.
   const runQuery = useCallback(
     async (question: string, assistantId: string) => {
       try {
@@ -113,8 +115,6 @@ export function ChatPanel({
     runQuery(question, assistantId);
   }
 
-  // Re-runs the last user question in place, resetting the last assistant
-  // bubble back to a streaming state rather than appending a duplicate pair.
   function regenerateLast() {
     if (busy) return;
     const lastAssistantIdx = [...messages].reverse().findIndex((m) => m.role === "ASSISTANT");
@@ -179,6 +179,7 @@ export function ChatPanel({
             </Button>
           )}
           <Textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -207,7 +208,7 @@ export function ChatPanel({
       </div>
     </div>
   );
-}
+});
 
 function EmptyState({ hasSources, onAsk }: { hasSources: boolean; onAsk: (q: string) => void }) {
   const suggestions = ["Summarize the key points across all sources", "What are the main takeaways?", "List anything that seems contradictory"];
@@ -239,4 +240,4 @@ function EmptyState({ hasSources, onAsk }: { hasSources: boolean; onAsk: (q: str
       )}
     </motion.div>
   );
-}
+};

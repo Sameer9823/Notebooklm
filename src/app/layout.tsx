@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "sonner";
@@ -12,6 +12,15 @@ export const metadata: Metadata = {
   title: "Index — AI research notebooks, grounded in your sources",
   description:
     "Upload PDFs, sites, transcripts and video, then ask questions answered only from what you gave it — every claim traceable to a source.",
+};
+
+// Without this, mobile browsers assume a ~980px desktop-width layout and
+// scale the whole page down to fit, which is why Tailwind's responsive
+// breakpoints (sm:/lg:/etc.) don't behave correctly on real phones — they're
+// evaluated against that fake wide viewport, not the device's actual width.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
